@@ -3,4 +3,3 @@ uvicorn
 supabase
 python-dotenv
 openai
-Procfile
