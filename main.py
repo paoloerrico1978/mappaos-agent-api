@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from supabase import create_client
 from dotenv import load_dotenv
+from openai import OpenAI
 import os
 
 load_dotenv()
@@ -10,8 +11,15 @@ app = FastAPI()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
 
 supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+
+client = OpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=OPENROUTER_API_KEY,
+)
 
 
 class SnapshotRequest(BaseModel):
@@ -37,3 +45,105 @@ def get_snapshot(request: SnapshotRequest):
         return {"error": "Company snapshot not found"}
 
     return response.data[0]
+
+
+@app.post("/growth-analysis")
+def growth_analysis(request: SnapshotRequest):
+    response = (
+        supabase
+        .table("company_snapshot")
+        .select("*")
+        .eq("company_id", request.company_id)
+        .execute()
+    )
+
+    if not response.data:
+        return {"error": "Company snapshot not found"}
+
+    snapshot = response.data[0]
+
+    prompt = f"""
+Sei il Growth Agent di MappaOS.
+
+Analizza questa azienda sulla base delle 6 direttrici della Mappa della Crescita:
+- Mercati Esteri
+- Finanziaria
+- Industriale
+- Penetration
+- Product
+- Market
+
+Dati azienda:
+{snapshot}
+
+Restituisci esclusivamente un JSON valido seguendo esattamente questa struttura:
+{{
+  "sintesi": "",
+  "punti_di_forza": [],
+  "aree_deboli": [],
+  "priorita_operative": [],
+  "prossime_azioni": [],
+  "rischi": []
+}}
+"""
+
+    completion = client.chat.completions.create(
+        timeout=30,
+        model=OPENROUTER_MODEL,
+        messages=[
+            {
+                "role": "system",
+                "content": """
+Sei il Growth Agent di MappaOS.
+
+Rispondi esclusivamente con JSON valido.
+
+Regole:
+- NON usare markdown
+- NON usare ```json
+- NON usare ```
+- NON aggiungere testo prima del JSON
+- NON aggiungere testo dopo il JSON
+- Restituisci solo un oggetto JSON valido
+"""
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+    )
+
+    analysis = completion.choices[0].message.content
+
+    supabase.table("agent_outputs").insert({
+        "company_id": request.company_id,
+        "agent_name": "growth_agent",
+        "output_type": "analysis",
+        "content": {
+            "analysis": analysis
+        }
+    }).execute()
+
+    return {
+        "company_id": request.company_id,
+        "analysis": analysis
+    }
+
+
+@app.get("/company-history/{company_id}")
+def company_history(company_id: str):
+    response = (
+        supabase
+        .table("agent_outputs")
+        .select("*")
+        .eq("company_id", company_id)
+        .order("created_at", desc=True)
+        .limit(10)
+        .execute()
+    )
+
+    return {
+        "company_id": company_id,
+        "history": response.data
+    }
