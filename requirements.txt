@@ -1,4 +1,6 @@
 fastapi
 uvicorn
 supabase
-python-dotenvopenai
+python-dotenv
+openai
+Procfile
