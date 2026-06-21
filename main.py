@@ -52,7 +52,7 @@ class AssessmentRequest(BaseModel):
     priority: int = 5
     maturity_level: str = ""
     notes: str = ""
-    
+
 
 @app.get("/")
 def root():
@@ -229,16 +229,17 @@ def create_document(request: DocumentRequest):
 
 @app.post("/assessment")
 def create_assessment(request: AssessmentRequest):
-
     response = supabase.table("assessments").insert({
         "company_id": request.company_id,
-        "assessment_name": request.assessment_name,
+        "assessment_name": "Manual update",
         "category": request.category,
         "score": request.score,
+        "priority": request.priority,
+        "maturity_level": request.maturity_level,
         "notes": request.notes
     }).execute()
 
     return {
         "company_id": request.company_id,
-        "assessment": response.data[0]
+        "assessment": response.data[0] if response.data else None
     }
