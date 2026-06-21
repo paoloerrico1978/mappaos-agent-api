@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from supabase import create_client
 from dotenv import load_dotenv
 from openai import OpenAI
+import fitz
 import os
 
 load_dotenv()
