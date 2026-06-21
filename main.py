@@ -25,6 +25,15 @@ client = OpenAI(
 class SnapshotRequest(BaseModel):
     company_id: str
 
+class MemoryRequest(BaseModel):
+    company_id: str
+    memory_type: str
+    title: str
+    content: str
+    category: str = "general"
+    source: str = "manual"
+    confidence: str = "medium"
+    importance: int = 5
 
 @app.get("/")
 def root():
@@ -146,4 +155,24 @@ def company_history(company_id: str):
     return {
         "company_id": company_id,
         "history": response.data
+    }
+
+
+@app.post("/memory")
+def create_memory(request: MemoryRequest):
+    response = supabase.table("company_memory").insert({
+        "company_id": request.company_id,
+        "memory_type": request.memory_type,
+        "title": request.title,
+        "content": request.content,
+        "category": request.category,
+        "source": request.source,
+        "confidence": request.confidence,
+        "importance": request.importance,
+        "status": "active"
+    }).execute()
+
+    return {
+        "company_id": request.company_id,
+        "memory": response.data[0] if response.data else None
     }
