@@ -443,3 +443,37 @@ def get_knowledge():
     )
 
     return response.data
+
+
+@app.delete("/memory/{memory_id}")
+def delete_memory(memory_id: str):
+    response = (
+        supabase
+        .table("company_memory")
+        .delete()
+        .eq("id", memory_id)
+        .execute()
+    )
+
+    return {
+        "deleted": True,
+        "memory_id": memory_id,
+        "data": response.data
+    }
+
+
+@app.delete("/document/{document_id}")
+def delete_document(document_id: str):
+    response = (
+        supabase
+        .table("documents")
+        .delete()
+        .eq("id", document_id)
+        .execute()
+    )
+
+    return {
+        "deleted": True,
+        "document_id": document_id,
+        "data": response.data
+    }
