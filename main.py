@@ -285,7 +285,7 @@ async def upload_pdf(
     }
 
 
-    @app.post("/agent-chat")
+@app.post("/agent-chat")
 def agent_chat(request: AgentChatRequest):
     response = (
         supabase
