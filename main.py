@@ -55,6 +55,19 @@ def get_snapshot(request: SnapshotRequest):
 
     return response.data[0]
 
+    documents = (
+    supabase
+    .table("documents")
+    .select("""
+        title,
+        document_type,
+        content,
+        source
+    """)
+    .eq("company_id", request.company_id)
+    .execute()
+)
+
 
 @app.post("/growth-analysis")
 def growth_analysis(request: SnapshotRequest):
@@ -176,3 +189,18 @@ def create_memory(request: MemoryRequest):
         "company_id": request.company_id,
         "memory": response.data[0] if response.data else None
     }
+
+
+    @app.post("/document")
+def create_document(request: DocumentRequest):
+
+    response = supabase.table("documents").insert({
+        "company_id": request.company_id,
+        "title": request.title,
+        "document_type": request.document_type,
+        "content": request.content,
+        "source": request.source,
+        "status": "active"
+    }).execute()
+
+    return response.data[0]
