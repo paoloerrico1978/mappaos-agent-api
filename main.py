@@ -35,6 +35,13 @@ class MemoryRequest(BaseModel):
     confidence: str = "medium"
     importance: int = 5
 
+class DocumentRequest(BaseModel):
+    company_id: str
+    title: str
+    document_type: str
+    content: str
+    source: str = "manual"
+
 @app.get("/")
 def root():
     return {"status": "MappaOS Agent API running"}
@@ -188,4 +195,21 @@ def create_memory(request: MemoryRequest):
     return {
         "company_id": request.company_id,
         "memory": response.data[0] if response.data else None
+    }
+
+
+@app.post("/document")
+def create_document(request: DocumentRequest):
+    response = supabase.table("documents").insert({
+        "company_id": request.company_id,
+        "title": request.title,
+        "document_type": request.document_type,
+        "content": request.content,
+        "source": request.source,
+        "status": "active"
+    }).execute()
+
+    return {
+        "company_id": request.company_id,
+        "document": response.data[0] if response.data else None
     }
