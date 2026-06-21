@@ -70,6 +70,56 @@ class KnowledgeRequest(BaseModel):
     importance: int = 5
 
 
+class AgentOverrideRequest(BaseModel):
+    company_id: str
+    agent_name: str
+    override_prompt: str = ""
+    custom_instructions: str = ""
+
+
+class SkillOverrideRequest(BaseModel):
+    company_id: str
+    agent_name: str
+    skill_name: str
+    override_prompt: str = ""
+    is_enabled: bool = True
+
+
+@app.post("/skill-override")
+def save_skill_override(request: SkillOverrideRequest):
+    response = supabase.table("company_agent_skill_overrides").insert({
+        "company_id": request.company_id,
+        "agent_name": request.agent_name,
+        "skill_name": request.skill_name,
+        "override_prompt": request.override_prompt,
+        "is_enabled": request.is_enabled
+    }).execute()
+
+    return {
+        "company_id": request.company_id,
+        "agent_name": request.agent_name,
+        "skill_name": request.skill_name,
+        "override": response.data[0] if response.data else None
+    }
+
+
+@app.post("/agent-override")
+def save_agent_override(request: AgentOverrideRequest):
+    response = supabase.table("company_agent_overrides").insert({
+        "company_id": request.company_id,
+        "agent_name": request.agent_name,
+        "override_prompt": request.override_prompt,
+        "custom_instructions": request.custom_instructions,
+        "is_active": True
+    }).execute()
+
+    return {
+        "company_id": request.company_id,
+        "agent_name": request.agent_name,
+        "override": response.data[0] if response.data else None
+    }
+
+
 @app.get("/")
 def root():
     return {"status": "MappaOS Agent API running"}
@@ -476,4 +526,41 @@ def delete_document(document_id: str):
         "deleted": True,
         "document_id": document_id,
         "data": response.data
+    }
+
+@app.get("/agent-config/{company_id}/{agent_name}")
+def get_agent_config(company_id: str, agent_name: str):
+    skills_response = (
+        supabase
+        .table("agent_skills")
+        .select("*")
+        .eq("agent_name", agent_name)
+        .execute()
+    )
+
+    overrides_response = (
+        supabase
+        .table("company_agent_skill_overrides")
+        .select("*")
+        .eq("company_id", company_id)
+        .eq("agent_name", agent_name)
+        .execute()
+    )
+
+    agent_override_response = (
+        supabase
+        .table("company_agent_overrides")
+        .select("*")
+        .eq("company_id", company_id)
+        .eq("agent_name", agent_name)
+        .eq("is_active", True)
+        .execute()
+    )
+
+    return {
+        "company_id": company_id,
+        "agent_name": agent_name,
+        "skills": skills_response.data,
+        "skill_overrides": overrides_response.data,
+        "agent_override": agent_override_response.data[0] if agent_override_response.data else None
     }
