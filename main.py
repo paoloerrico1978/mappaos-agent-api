@@ -42,6 +42,15 @@ class DocumentRequest(BaseModel):
     content: str
     source: str = "manual"
 
+ class AssessmentRequest(BaseModel):
+    company_id: str
+    category: str
+    score: int
+    priority: int
+    maturity_level: str
+    notes: str = ""
+    
+
 @app.get("/")
 def root():
     return {"status": "MappaOS Agent API running"}
@@ -212,4 +221,21 @@ def create_document(request: DocumentRequest):
     return {
         "company_id": request.company_id,
         "document": response.data[0] if response.data else None
+    }
+
+
+@app.post("/assessment")
+def create_assessment(request: AssessmentRequest):
+
+    response = supabase.table("assessments").insert({
+        "company_id": request.company_id,
+        "assessment_name": request.assessment_name,
+        "category": request.category,
+        "score": request.score,
+        "notes": request.notes
+    }).execute()
+
+    return {
+        "company_id": request.company_id,
+        "assessment": response.data[0]
     }
