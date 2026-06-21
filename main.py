@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File, Form
 from pydantic import BaseModel
 from supabase import create_client
 from dotenv import load_dotenv
@@ -242,4 +242,37 @@ def create_assessment(request: AssessmentRequest):
     return {
         "company_id": request.company_id,
         "assessment": response.data[0] if response.data else None
+    }
+
+
+@app.post("/upload-pdf")
+async def upload_pdf(
+    company_id: str = Form(...),
+    document_type: str = Form("pdf"),
+    source: str = Form("upload"),
+    file: UploadFile = File(...)
+):
+    pdf_bytes = await file.read()
+
+    pdf_doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    extracted_text = ""
+
+    for page in pdf_doc:
+        extracted_text += page.get_text()
+
+    response = supabase.table("documents").insert({
+        "company_id": company_id,
+        "file_name": file.filename,
+        "title": file.filename,
+        "document_type": document_type,
+        "content": extracted_text[:50000],
+        "source": source,
+        "status": "processed"
+    }).execute()
+
+    return {
+        "company_id": company_id,
+        "file_name": file.filename,
+        "characters_extracted": len(extracted_text),
+        "document": response.data[0] if response.data else None
     }
