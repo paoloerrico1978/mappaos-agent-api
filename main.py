@@ -153,6 +153,43 @@ def get_snapshot(request: SnapshotRequest):
     .execute()
 )
 
+def get_agent_configuration(company_id: str, agent_name: str):
+    skills_response = (
+        supabase
+        .table("agent_skills")
+        .select("*")
+        .eq("agent_name", agent_name)
+        .execute()
+    )
+
+    skill_overrides_response = (
+        supabase
+        .table("company_agent_skill_overrides")
+        .select("*")
+        .eq("company_id", company_id)
+        .eq("agent_name", agent_name)
+        .eq("is_enabled", True)
+        .execute()
+    )
+
+    agent_override_response = (
+        supabase
+        .table("company_agent_overrides")
+        .select("*")
+        .eq("company_id", company_id)
+        .eq("agent_name", agent_name)
+        .eq("is_active", True)
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+
+    return {
+        "skills": skills_response.data or [],
+        "skill_overrides": skill_overrides_response.data or [],
+        "agent_override": agent_override_response.data[0] if agent_override_response.data else None
+    }
+
 
 @app.post("/growth-analysis")
 def growth_analysis(request: SnapshotRequest):
@@ -179,6 +216,7 @@ def growth_analysis(request: SnapshotRequest):
     )
 
     knowledge = knowledge_response.data
+    agent_config = get_agent_configuration(request.company_id, "growth_agent")
 
     prompt = f"""
 Sei il Growth Agent di MappaOS.
@@ -205,6 +243,17 @@ Documenti aziendali:
 CONOSCENZA DELLA MAPPA DELLA CRESCITA
 
 {knowledge}
+
+CONFIGURAZIONE GROWTH AGENT
+
+Skill standard MappaOS:
+{agent_config["skills"]}
+
+Override skill aziendali:
+{agent_config["skill_overrides"]}
+
+Istruzioni specifiche aziendali:
+{agent_config["agent_override"]}
 
 REGOLE DI PRIORITÀ
 
@@ -403,6 +452,7 @@ def agent_chat(request: AgentChatRequest):
     }
 
     selected_prompt = agent_prompts.get(request.agent_name, agent_prompts["growth_agent"])
+    agent_config = get_agent_configuration(request.company_id, request.agent_name)
 
     supabase.table("agent_messages").insert({
         "company_id": request.company_id,
@@ -413,6 +463,17 @@ def agent_chat(request: AgentChatRequest):
 
     prompt = f"""
 {selected_prompt}
+
+CONFIGURAZIONE AGENTE
+
+Skill standard:
+{agent_config["skills"]}
+
+Override skill aziendali:
+{agent_config["skill_overrides"]}
+
+Istruzioni specifiche aziendali:
+{agent_config["agent_override"]}
 
 Contesto aziendale:
 Assessment:
