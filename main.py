@@ -61,6 +61,15 @@ class AgentChatRequest(BaseModel):
     agent_name: str = "growth_agent"
 
 
+class KnowledgeRequest(BaseModel):
+    category: str
+    station: str
+    title: str
+    content: str
+    source: str = "mappa"
+    importance: int = 5
+
+
 @app.get("/")
 def root():
     return {"status": "MappaOS Agent API running"}
@@ -110,6 +119,17 @@ def growth_analysis(request: SnapshotRequest):
 
     snapshot = response.data[0]
 
+    knowledge_response = (
+        supabase
+        .table("knowledge_base")
+        .select("*")
+        .order("importance", desc=True)
+        .limit(20)
+        .execute()
+    )
+
+    knowledge = knowledge_response.data
+
     prompt = f"""
 Sei il Growth Agent di MappaOS.
 
@@ -121,14 +141,35 @@ Analizza questa azienda sulla base delle 6 direttrici della Mappa della Crescita
 - Product
 - Market
 
-Dati azienda:
-{snapshot}
+CONTESTO AZIENDALE
+
+Assessment:
+{snapshot["assessments"]}
+
+Memorie aziendali:
+{snapshot["memories"]}
+
+Documenti aziendali:
+{snapshot["documents"]}
+
+CONOSCENZA DELLA MAPPA DELLA CRESCITA
+
+{knowledge}
+
+REGOLE DI PRIORITÀ
+
+1. Le informazioni aziendali hanno sempre priorità.
+2. Assessment, memorie e documenti aziendali sono la fonte primaria.
+3. La Knowledge Base della Mappa serve come metodo, benchmark e best practice.
+4. Se la conoscenza generale è in contrasto con la realtà aziendale, prevale la realtà aziendale.
+5. Quando usi una best practice o un principio della Mappa, rendilo esplicito.
 
 Restituisci esclusivamente un JSON valido seguendo esattamente questa struttura:
 {{
   "sintesi": "",
   "punti_di_forza": [],
   "aree_deboli": [],
+  "suggerimenti_mappa": [],
   "priorita_operative": [],
   "prossime_azioni": [],
   "rischi": []
@@ -373,3 +414,32 @@ Struttura la risposta in:
         "message": request.message,
         "answer": answer
     }
+
+
+@app.post("/knowledge")
+def create_knowledge(request: KnowledgeRequest):
+
+    response = supabase.table("knowledge_base").insert({
+        "category": request.category,
+        "station": request.station,
+        "title": request.title,
+        "content": request.content,
+        "source": request.source,
+        "importance": request.importance
+    }).execute()
+
+    return response.data[0]
+
+
+@app.get("/knowledge")
+def get_knowledge():
+
+    response = (
+        supabase
+        .table("knowledge_base")
+        .select("*")
+        .order("importance", desc=True)
+        .execute()
+    )
+
+    return response.data
