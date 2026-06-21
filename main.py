@@ -25,6 +25,7 @@ client = OpenAI(
 class SnapshotRequest(BaseModel):
     company_id: str
 
+
 class MemoryRequest(BaseModel):
     company_id: str
     memory_type: str
@@ -35,6 +36,7 @@ class MemoryRequest(BaseModel):
     confidence: str = "medium"
     importance: int = 5
 
+
 class DocumentRequest(BaseModel):
     company_id: str
     title: str
@@ -42,12 +44,13 @@ class DocumentRequest(BaseModel):
     content: str
     source: str = "manual"
 
- class AssessmentRequest(BaseModel):
+
+class AssessmentRequest(BaseModel):
     company_id: str
     category: str
     score: int
-    priority: int
-    maturity_level: str
+    priority: int = 5
+    maturity_level: str = ""
     notes: str = ""
     
 
