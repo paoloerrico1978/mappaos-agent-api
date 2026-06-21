@@ -55,6 +55,12 @@ class AssessmentRequest(BaseModel):
     notes: str = ""
 
 
+class AgentChatRequest(BaseModel):
+    company_id: str
+    message: str
+    agent_name: str = "growth_agent"
+
+
 @app.get("/")
 def root():
     return {"status": "MappaOS Agent API running"}
@@ -276,4 +282,94 @@ async def upload_pdf(
         "file_name": file.filename,
         "characters_extracted": len(extracted_text),
         "document": response.data[0] if response.data else None
+    }
+
+
+    @app.post("/agent-chat")
+def agent_chat(request: AgentChatRequest):
+    response = (
+        supabase
+        .table("company_snapshot")
+        .select("*")
+        .eq("company_id", request.company_id)
+        .execute()
+    )
+
+    if not response.data:
+        return {"error": "Company snapshot not found"}
+
+    snapshot = response.data[0]
+
+    agent_prompts = {
+        "growth_agent": "Sei il Growth Agent. Ti occupi di crescita complessiva, priorità strategiche e roadmap.",
+        "cfo_agent": "Sei il CFO Agent. Ti occupi di finanza, marginalità, cassa, PFN, sostenibilità economica e rischi finanziari.",
+        "export_agent": "Sei l'Export Agent. Ti occupi di mercati esteri, internazionalizzazione, canali distributivi e priorità paese.",
+        "hr_agent": "Sei l'HR Agent. Ti occupi di persone, organizzazione, competenze, ruoli, leadership e struttura.",
+        "sales_agent": "Sei il Sales Agent. Ti occupi di vendite, pipeline, conversione, clienti, pricing e go-to-market.",
+        "operations_agent": "Sei l'Operations Agent. Ti occupi di processi, produzione, efficienza, qualità e capacità operativa.",
+        "esg_agent": "Sei l'ESG Agent. Ti occupi di sostenibilità, compliance ESG, impatti ambientali, sociali e governance.",
+        "legal_agent": "Sei il Legal Agent. Ti occupi di rischi legali, contratti, compliance e governance."
+    }
+
+    selected_prompt = agent_prompts.get(request.agent_name, agent_prompts["growth_agent"])
+
+    supabase.table("agent_messages").insert({
+        "company_id": request.company_id,
+        "agent_name": request.agent_name,
+        "role": "user",
+        "content": request.message
+    }).execute()
+
+    prompt = f"""
+{selected_prompt}
+
+Contesto aziendale:
+Assessment:
+{snapshot["assessments"]}
+
+Memorie:
+{snapshot["memories"]}
+
+Documenti:
+{snapshot["documents"]}
+
+Domanda utente:
+{request.message}
+
+Rispondi in italiano, come consulente professionale.
+Struttura la risposta in:
+1. Analisi
+2. Criticità
+3. Azioni consigliate
+"""
+
+    completion = client.chat.completions.create(
+        timeout=30,
+        model=OPENROUTER_MODEL,
+        messages=[
+            {
+                "role": "system",
+                "content": "Sei un agente consulenziale specializzato per PMI. Usa solo il contesto disponibile e dichiara le incertezze."
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+    )
+
+    answer = completion.choices[0].message.content
+
+    supabase.table("agent_messages").insert({
+        "company_id": request.company_id,
+        "agent_name": request.agent_name,
+        "role": "assistant",
+        "content": answer
+    }).execute()
+
+    return {
+        "company_id": request.company_id,
+        "agent_name": request.agent_name,
+        "message": request.message,
+        "answer": answer
     }
