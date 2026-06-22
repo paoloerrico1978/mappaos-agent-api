@@ -85,6 +85,18 @@ class SkillOverrideRequest(BaseModel):
     is_enabled: bool = True
 
 
+class JobRequest(BaseModel):
+    company_id: str
+    name: str
+    agent_name: str
+    prompt: str
+    frequency: str = "manual"
+    trigger_type: str = "manual"
+    output_type: str = "report"
+    destination: str = "agent_output"
+    next_run: str = None
+
+
 @app.post("/skill-override")
 def save_skill_override(request: SkillOverrideRequest):
     response = supabase.table("company_agent_skill_overrides").insert({
@@ -627,3 +639,20 @@ def get_agent_config(company_id: str, agent_name: str):
     }
 
 @app.post("/run-job/{job_id}")
+
+@app.post("/jobs")
+def create_job(request: JobRequest):
+    response = supabase.table("scheduled_jobs").insert({
+        "company_id": request.company_id,
+        "name": request.name,
+        "agent_name": request.agent_name,
+        "prompt": request.prompt,
+        "frequency": request.frequency,
+        "trigger_type": request.trigger_type,
+        "output_type": request.output_type,
+        "destination": request.destination,
+        "next_run": request.next_run,
+        "enabled": True
+    }).execute()
+
+    return response.data[0] if response.data else None
