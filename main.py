@@ -640,7 +640,6 @@ def get_agent_config(company_id: str, agent_name: str):
 
 @app.post("/run-job/{job_id}")
 
-}
 
 @app.post("/jobs")
 def create_job(request: JobRequest):
