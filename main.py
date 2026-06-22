@@ -757,3 +757,94 @@ Restituisci un report operativo in italiano con:
         "agent_name": job["agent_name"],
         "output": output
     }
+
+@app.post("/run-job/{job_id}")
+def run_job(job_id: str):
+    job_response = (
+        supabase
+        .table("scheduled_jobs")
+        .select("*")
+        .eq("id", job_id)
+        .single()
+        .execute()
+    )
+
+    job = job_response.data
+
+    if not job:
+        return {"error": "Job not found"}
+
+    snapshot_response = (
+        supabase
+        .table("company_snapshot")
+        .select("*")
+        .eq("company_id", job["company_id"])
+        .execute()
+    )
+
+    if not snapshot_response.data:
+        return {"error": "Company snapshot not found"}
+
+    snapshot = snapshot_response.data[0]
+
+    prompt = f"""
+Sei {job["agent_name"]} di MappaOS.
+
+Devi eseguire questa attività programmata:
+
+Nome attività:
+{job["name"]}
+
+Prompt attività:
+{job["prompt"]}
+
+Contesto aziendale:
+{snapshot}
+
+Restituisci un report operativo in italiano con:
+1. Sintesi
+2. Evidenze
+3. Rischi
+4. Azioni consigliate
+"""
+
+    completion = client.chat.completions.create(
+        timeout=30,
+        model=OPENROUTER_MODEL,
+        messages=[
+            {
+                "role": "system",
+                "content": "Sei un agente operativo per PMI. Produci output chiari, concreti e utilizzabili."
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+    )
+
+    output = completion.choices[0].message.content
+
+    supabase.table("agent_outputs").insert({
+        "company_id": job["company_id"],
+        "agent_name": job["agent_name"],
+        "output_type": job["output_type"],
+        "content": {
+            "job_id": job_id,
+            "job_name": job["name"],
+            "output": output
+        }
+    }).execute()
+
+    from datetime import datetime, timezone
+
+    supabase.table("scheduled_jobs").update({
+        "last_run": datetime.now(timezone.utc).isoformat()
+    }).eq("id", job_id).execute()
+
+    return {
+        "job_id": job_id,
+        "company_id": job["company_id"],
+        "agent_name": job["agent_name"],
+        "output": output
+    }
