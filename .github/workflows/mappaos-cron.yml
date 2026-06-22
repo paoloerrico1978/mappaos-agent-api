@@ -1,0 +1,16 @@
+name: MappaOS Scheduler
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+
+jobs:
+  scheduler:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Run scheduler
+        run: |
+          curl -X POST \
+          https://mappaos-agent-api-production.up.railway.app/run-due-jobs \
+          -H "X-CRON-KEY: ${{ secrets.CRON_SECRET }}"
