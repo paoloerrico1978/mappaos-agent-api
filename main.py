@@ -640,6 +640,8 @@ def get_agent_config(company_id: str, agent_name: str):
 
 @app.post("/run-job/{job_id}")
 
+}
+
 @app.post("/jobs")
 def create_job(request: JobRequest):
     response = supabase.table("scheduled_jobs").insert({
@@ -656,3 +658,102 @@ def create_job(request: JobRequest):
     }).execute()
 
     return response.data[0] if response.data else None
+
+
+@app.get("/jobs/{company_id}")
+def list_jobs(company_id: str):
+    response = (
+        supabase
+        .table("scheduled_jobs")
+        .select("*")
+        .eq("company_id", company_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+
+    return response.data
+
+@app.post("/run-job/{job_id}")
+def run_job(job_id: str):
+    job_response = (
+        supabase
+        .table("scheduled_jobs")
+        .select("*")
+        .eq("id", job_id)
+        .single()
+        .execute()
+    )
+
+    job = job_response.data
+
+    if not job:
+        return {"error": "Job not found"}
+
+    snapshot_response = (
+        supabase
+        .table("company_snapshot")
+        .select("*")
+        .eq("company_id", job["company_id"])
+        .execute()
+    )
+
+    if not snapshot_response.data:
+        return {"error": "Company snapshot not found"}
+
+    snapshot = snapshot_response.data[0]
+
+    prompt = f"""
+Sei {job["agent_name"]} di MappaOS.
+
+Devi eseguire questa attività programmata:
+
+{job["prompt"]}
+
+Contesto aziendale:
+{snapshot}
+
+Restituisci un report operativo in italiano con:
+1. Sintesi
+2. Evidenze
+3. Rischi
+4. Azioni consigliate
+"""
+
+    completion = client.chat.completions.create(
+        timeout=30,
+        model=OPENROUTER_MODEL,
+        messages=[
+            {
+                "role": "system",
+                "content": "Sei un agente operativo per PMI. Produci output chiari, concreti e utilizzabili."
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+    )
+
+    output = completion.choices[0].message.content
+
+    supabase.table("agent_outputs").insert({
+        "company_id": job["company_id"],
+        "agent_name": job["agent_name"],
+        "output_type": job["output_type"],
+        "content": {
+            "job_id": job_id,
+            "job_name": job["name"],
+            "output": output
+        }
+    }).execute()
+
+    supabase.table("scheduled_jobs").update({
+        "last_run": "now()"
+    }).eq("id", job_id).execute()
+
+    return {
+        "job_id": job_id,
+        "company_id": job["company_id"],
+        "agent_name": job["agent_name"],
+        "output": output
+    }
