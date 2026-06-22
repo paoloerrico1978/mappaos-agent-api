@@ -847,3 +847,85 @@ Restituisci un report operativo in italiano con:
         "agent_name": job["agent_name"],
         "output": output
     }
+
+@app.post("/run-due-jobs")
+def run_due_jobs():
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    jobs_response = (
+        supabase
+        .table("scheduled_jobs")
+        .select("*")
+        .eq("enabled", True)
+        .lte("next_run", now_iso)
+        .execute()
+    )
+
+    jobs = jobs_response.data or []
+    results = []
+
+    for job in jobs:
+        result = run_job(job["id"])
+        results.append(result)
+
+    return {
+        "executed": len(results),
+        "results": results
+    }
+
+from fastapi import Header, HTTPException
+
+@app.post("/run-due-jobs")
+def run_due_jobs(x_cron_key: str = Header(None)):
+
+    if x_cron_key != os.getenv("CRON_SECRET"):
+        raise HTTPException(
+            status_code=401,
+            detail="Unauthorized"
+        )
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    jobs_response = (
+        supabase
+        .table("scheduled_jobs")
+        .select("*")
+        .eq("enabled", True)
+        .lte("next_run", now_iso)
+        .execute()
+    )
+
+    jobs = jobs_response.data or []
+
+    results = []
+
+    for job in jobs:
+        result = run_job(job["id"])
+        results.append(result)
+
+    return {
+        "executed": len(results),
+        "results": results
+    }
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    jobs_response = (
+        supabase
+        .table("scheduled_jobs")
+        .select("*")
+        .eq("enabled", True)
+        .lte("next_run", now_iso)
+        .execute()
+    )
+
+    jobs = jobs_response.data or []
+    results = []
+
+    for job in jobs:
+        result = run_job(job["id"])
+        results.append(result)
+
+    return {
+        "executed": len(results),
+        "results": results
+    }
