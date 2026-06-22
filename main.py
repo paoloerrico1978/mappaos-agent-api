@@ -625,3 +625,5 @@ def get_agent_config(company_id: str, agent_name: str):
         "skill_overrides": overrides_response.data,
         "agent_override": agent_override_response.data[0] if agent_override_response.data else None
     }
+
+@app.post("/run-job/{job_id}")
